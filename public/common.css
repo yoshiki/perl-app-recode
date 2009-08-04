@@ -1,0 +1,50 @@
+body {
+    font-family: helvetica, arial, clean, sans-serif;
+    font-size: 13.34px;
+    font-size-adjust: none;
+    font-style: normal;
+    font-variant: normal;
+    font-weight: normal;
+    line-height: 1.4em;
+}
+
+#wrapper {
+    margin: 1% 1.1% 1% 0.9%;
+}
+
+#logo {
+    font: 2em helvetica, arial, sans-serif;
+    margin: 0.4em 0;
+}
+
+select, input, textarea {
+    margin: 5px 0 5px 0;
+}
+
+input.name {
+    width: 30%;
+}
+
+textarea.contents {
+    font-family: 'Courier', monospace;
+    font-size: 90%;
+    height: 40em;
+    width: 70%;
+}
+
+input.paste {
+    font-size: 20px;
+}
+
+div.name {
+    font-size: 1.4em;
+    margin: 0.3em 0;
+}
+
+div.contents {
+    font-family: 'Courier', monospace;
+    font-size: 90%;
+    height: 40em;
+    width: 70%;
+    line-height: 1.4em;
+}
