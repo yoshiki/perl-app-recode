@@ -11,7 +11,7 @@ use Cwd;
 
 our $VERSION = 0.01;
 our $SERVER  = '127.0.0.1';
-our $DB_FILE = Cwd::getcwd . '/pist.db';
+our $DB_FILE = Cwd::getcwd . '/recode.db';
 our $GIT_DIR = Cwd::getcwd . '/repos';
 
 sub set_routes {
@@ -21,7 +21,7 @@ sub set_routes {
         my $id = $self->stash( 'id' );
         if ( $id ) {
             my $dbh = dbh();
-            my $sth = $dbh->prepare( 'SELECT * FROM pists WHERE id = ?' );
+            my $sth = $dbh->prepare( 'SELECT * FROM recodes WHERE id = ?' );
             $sth->execute( $id );
             my $rec = $sth->fetchrow_hashref;
             $self->stash(
@@ -36,18 +36,18 @@ sub set_routes {
             $self->res->headers->header( location => '/' );
         }
     };
-    post '/pists' => sub {
+    post '/recodes' => sub {
         my $self = shift;
         my $name = $self->req->param( 'name' );
         my $contents = $self->req->param( 'contents' );
         my $lang = $self->req->param( 'lang' );
         my $dbh = dbh();
         my $sth = $dbh->prepare( <<'SQL' );
-INSERT INTO pists (name, contents, lang) VALUES (?, ?, ?)
+INSERT INTO recodes (name, contents, lang) VALUES (?, ?, ?)
 SQL
         my $rv = $sth->execute( $name, $contents, $lang );
         if ( $rv ) {
-            $sth = $dbh->prepare( 'SELECT * FROM pists ORDER BY id DESC LIMIT 1' );
+            $sth = $dbh->prepare( 'SELECT * FROM recodes ORDER BY id DESC LIMIT 1' );
             $sth->execute();
             my $data = $sth->fetchrow_hashref;
             create_repository( $data );
@@ -78,7 +78,7 @@ sub create_repository {
     my $data = shift;
     my $dir = Cwd::getcwd . "/$data->{ id }";
     File::Path::mkpath $dir;
-    my $file = "$dir/" . ($data->{ name } || 'pistfile');
+    my $file = "$dir/" . ($data->{ name } || 'recodefile');
     open my $fh, '>', $file or die $!;
     print $fh $data->{ contents };
     close $fh;
@@ -99,7 +99,7 @@ sub init {
     unless ( -f $DB_FILE ) {
         my $dbh = dbh();
         $dbh->do(<<'SQL');
-CREATE TABLE pists (
+CREATE TABLE recodes (
     id INTEGER NOT NULL PRIMARY KEY,
     name TEXT,
     contents TEXT NOT NULL,
@@ -141,7 +141,7 @@ __DATA__
 % $self->stash( layout => 'base' );
 
 <div id="data">
-<form action="pists" method="post">
+<form action="recodes" method="post">
 <div class="input_name">
 <input type="text" name="name" class="name"/>
 </div>
@@ -162,7 +162,7 @@ __DATA__
 <!html>
 <head>
 <meta http-equiv="content-type" content="text/html;charset=UTF-8" />
-<title>pist</title>
+<title>recode</title>
 <style>
 body {
     font: 13.34px helvetica, arial, clean, sans-serif;
@@ -256,7 +256,7 @@ div#data {
 <body>
 <div id="wrapper">
 <div id="header">
-<div id="logo"><a href="/">pist</a></div>
+<div id="logo"><a href="/">recode</a></div>
 </div>
 <div id="main">
 <%= $self->render_inner %>
