@@ -7,9 +7,12 @@ use DBI;
 use HTML::Entities;
 use Encode;
 use File::Path;
+use Cwd;
 
 our $VERSION = 0.01;
-our $DB_FILE = 'pist.db';
+our $SERVER  = '127.0.0.1';
+our $DB_FILE = Cwd::getcwd . '/pist.db';
+our $GIT_DIR = Cwd::getcwd . '/repos';
 
 sub set_routes {
     get '/' => 'index';
@@ -21,10 +24,11 @@ sub set_routes {
             my $sth = $dbh->prepare( 'SELECT * FROM pists WHERE id = ?' );
             $sth->execute( $id );
             my $rec = $sth->fetchrow_hashref;
-            use Devel::Peek;
-            Dump $rec->{contents};
-            $self->stash( name => escape( $rec->{ name } ) );
-            $self->stash( contents => nl2br( escape( $rec->{ contents } ) ) );
+            $self->stash(
+                server   => $SERVER,
+                name     => escape( $rec->{ name } ),
+                contents => nl2br( escape( $rec->{ contents } ) ),
+            );
             $self->render( template => 'view' );
         }
         else {
@@ -45,9 +49,10 @@ SQL
         if ( $rv ) {
             $sth = $dbh->prepare( 'SELECT * FROM pists ORDER BY id DESC LIMIT 1' );
             $sth->execute();
-            my $rec = $sth->fetchrow_hashref;
+            my $data = $sth->fetchrow_hashref;
+            create_repository( $data );
             $self->res->code( 302 );
-            $self->res->headers->header( location => '/' . $rec->{ id } );
+            $self->res->headers->header( location => '/' . $data->{ id } );
         }
         else {
             $self->stash( error => $dbh->errstr );
@@ -58,7 +63,9 @@ SQL
 
 sub escape {
     my $str = shift;
-    return HTML::Entities::encode_entities( $str, '<>&"' );
+    $str = HTML::Entities::encode_entities( $str, '<>&"' );
+    $str =~ s/ /&nbsp;/g;
+    return $str;
 }
 
 sub nl2br {
@@ -67,14 +74,21 @@ sub nl2br {
     return $str;
 }
 
-sub create_repo {
-    my ( $id, $name, $contents ) = @_;
-    File::Path::make_path( $id );
-    open my $fh, '>', "$id/" . ($name || 'pistfile') or die $!;
-    print $fh $contents;
+sub create_repository {
+    my $data = shift;
+    my $dir = Cwd::getcwd . "/$data->{ id }";
+    File::Path::mkpath $dir;
+    my $file = "$dir/" . ($data->{ name } || 'pistfile');
+    open my $fh, '>', $file or die $!;
+    print $fh $data->{ contents };
     close $fh;
-
-    
+    my $cmd = sprintf 'cd %s && git init && git add . && git commit -m "init"', $dir;
+    system( $cmd );
+    $cmd = sprintf 'git clone --bare %s %s/%s.git', $dir, $GIT_DIR, $data->{ id };
+    system( $cmd );
+    $cmd = sprintf 'touch %s/%s.git/git-daemon-export-ok', $GIT_DIR, $data->{ id };
+    system( $cmd );
+    File::Path::rmtree $dir;
 }
 
 sub dbh {
@@ -94,6 +108,9 @@ CREATE TABLE pists (
 SQL
         $dbh->disconnect;
     }
+    unless ( -d $GIT_DIR ) {
+        File::Path::mkpath $GIT_DIR;
+    }
 }
 
 init;
@@ -111,13 +128,19 @@ __DATA__
 % my $self = shift;
 % $self->stash( layout => 'base' );
 
+<div id="data">
+<div class="repos"><span class="label">Clone URL: </span><span class="repos_url">git://<%= $self->stash( 'server' ) %>/<%= $self->stash( 'id' ) %>.git</span></div>
 <div class="name"><%= $self->stash( 'name' ) %></div>
 <div class="contents"><%= $self->stash( 'contents' ) %></div>
+</div>
+<div id="meta">
+</div>
 
 @@ index.html.eplite
 % my $self = shift;
 % $self->stash( layout => 'base' );
 
+<div id="data">
 <form action="pists" method="post">
 <div class="input_name">
 <input type="text" name="name" class="name"/>
@@ -126,9 +149,12 @@ __DATA__
 <textarea name="contents" class="contents"></textarea>
 </div>
 <div class="input_paste">
-<input type="submit" value="Paste" class="paste" />
+<input type="submit" value="&nbsp;&nbsp;Paste&nbsp;&nbsp;" class="paste" />
 </div>
 </form>
+</div>
+<div id="meta">
+</div>
 
 @@ layouts/base.html.eplite
 % my $self = shift;
@@ -136,15 +162,105 @@ __DATA__
 <!html>
 <head>
 <meta http-equiv="content-type" content="text/html;charset=UTF-8" />
-<title>Pist</title>
-<link href="/common.css" rel="stylesheet" type="text/css" />
-<link href="/prettify.css" rel="stylesheet" type="text/css" />
-<script type="text/css" src="prettify.js"></script>
+<title>pist</title>
+<style>
+body {
+    font: 13.34px helvetica, arial, clean, sans-serif;
+    font-size-adjust: none;
+    font-style: normal;
+    font-variant: normal;
+    font-weight: normal;
+    line-height: 1.4em;
+    text-align: center;
+}
+
+a, a:link, a:hover {
+    text-decoration: none;
+    color: #3399ff;
+}
+
+div#wrapper {
+    margin: 1% 1.1% 1% 0.9%;
+}
+
+div#logo {
+    font: 2.5em 'Courier', monospace;
+    margin: 0.4em 0;
+}
+
+select, input, textarea {
+    margin: 5px 0 5px 0;
+}
+
+input.name {
+    width: 100%;
+    border: 1px solid #ccc;
+    font-size: 1.4em;
+}
+
+div.textarea_contents {
+    font-family: 'Courier', monospace;
+}
+
+textarea.contents {
+    border: 1px solid #ccc;
+    height: 40em;
+    width: 100%;
+    font-size: 0.8em;
+}
+
+span.label {
+    font-family: helvetica, arial, sans-serif;
+    margin-right: 5px;
+}
+
+div.input_paste {
+    text-align: right;
+    font-size: 20px;
+}
+
+div.repos {
+    padding: 5px;
+    font-family: 'Courier', monospace;
+    font-size: 90%;
+    text-align: left;
+}
+
+div.name {
+    font: 1.4em helvetica, arial, sans-serif;
+    margin: 0.3em 0;
+    padding: 5px;
+    border: 1px solid #ccc;
+    background-color: #eee;
+    text-align: left;
+}
+
+div.contents {
+    font: 0.9em 'Courier', monospace;
+    line-height: 1.2em;
+    padding: 5px;
+    border: 1px solid #ccc;
+    text-align: left;
+}
+
+div#main {
+    margin: 0 8.0em;
+    text-align: center;
+}
+
+div#data {
+    width: 70%;
+}
+</style>
 </head>
 <body>
 <div id="wrapper">
-<div id="logo"><a href="/">Pist</a></div>
+<div id="header">
+<div id="logo"><a href="/">pist</a></div>
+</div>
+<div id="main">
 <%= $self->render_inner %>
+</div>
 </div>
 </body>
 </html>
