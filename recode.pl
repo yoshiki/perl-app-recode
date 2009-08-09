@@ -12,7 +12,6 @@ use Digest::SHA1 ();
 our $VERSION   = 0.01;
 our $SERVER    = '127.0.0.1';
 our $BASE_DIR  = Cwd::getcwd();
-our $DB_FILE   = "$BASE_DIR/recode.db";
 our $REPOS_DIR = dir( "$BASE_DIR/repos" );
 our $BARE_DIR  = dir( "$BASE_DIR/bare" );
 
