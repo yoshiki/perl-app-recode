@@ -1,0 +1,7 @@
+* Gist clone
+
+- Run command
+% ./recode.pl daemon
+
+- git daemon command
+git daemon --export-all --enable=receive-pack --base-path=YOUR_REPOS_PATH
