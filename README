@@ -1,7 +1,13 @@
-* Gist clone
+recode - gist clone
 
-- Run command
-% ./recode.pl daemon
+* How to start
 
-- git daemon command
-git daemon --export-all --enable=receive-pack --base-path=YOUR_REPOS_PATH
+1. Run recode.pl as a daemon.
+
+  % ./recode.pl daemon
+
+2. Run git-daemon. YOUR_REPOS_PATH is 'bare'.
+   'bare' directory was created when recode.pl runs.
+
+  % git daemon --export-all --enable=receive-pack --base-path=YOUR_REPOS_PATH
+

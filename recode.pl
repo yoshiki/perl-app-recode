@@ -2,12 +2,12 @@
 
 use strict;
 use Mojolicious::Lite;
-use Git::Class;
-use DBI;
-use HTML::Entities;
+use HTML::Entities ();
+use URI::Escape ();
 use Path::Class;
 use Cwd ();
 use Digest::SHA1 ();
+use Encode ();
 
 our $VERSION   = 0.01;
 our $SERVER    = '127.0.0.1';
@@ -25,7 +25,13 @@ sub digest {
     substr Digest::SHA1::sha1_hex({} . time . $$), 0, $len;
 }
 
-sub escape {
+sub uri_escape {
+    my $str = shift;
+    $str = URI::Escape::uri_escape( $str );
+    return $str;
+}
+
+sub html_escape {
     my $str = shift;
     $str = HTML::Entities::encode_entities( $str, '<>&"' );
     $str =~ s/ /&nbsp;/g;
@@ -69,16 +75,16 @@ sub create_repos {
     close $fh;
 
     # init repos
-    my $bare = dir( sprintf '%s/%s.git', $BARE_DIR, $digest );
+    my $bare = dir( "$BARE_DIR/${digest}.git" );
     system( sprintf 'cd %s && git init && git add . && git commit -m "init"', $repos );
     # clone repos
-    system( sprintf 'git clone --bare %s %s', $repos, $bare );
+    clone_bare_repos( $digest );
     # touch setting file
     system( sprintf 'touch %s/git-daemon-export-ok', $bare );
 
     # re-clone repos
     $repos->rmtree if -d $repos;
-    system( sprintf 'git clone %s %s', $bare, $repos);
+    clone_repos( $digest );
     return $digest;
 }
 
@@ -93,11 +99,27 @@ sub read_repos {
         my $cmd = sprintf 'cd %s && git cat-file %s %s', $repos, $kind, $sha1;
         my $contents = qx( $cmd );
         push @blobs, {
-            name     => $name,
+            name     => $name =~ /^".+"$/ ? eval $name : $name,
             contents => $contents,
         };
     }
     return \@blobs;
+}
+
+sub clone_repos {
+    my $digest = shift;
+    my $repos = dir( "$REPOS_DIR/$digest" );
+    my $bare = dir( "$BARE_DIR/${digest}.git" );
+    $repos->rmtree if -d $repos;
+    system( sprintf 'git clone %s %s', $bare, $repos );
+}
+
+sub clone_bare_repos {
+    my $digest = shift;
+    my $repos = dir( "$REPOS_DIR/$digest" );
+    my $bare = dir( "$BARE_DIR/${digest}.git" );
+    $bare->rmtree if -d $bare;
+    system( sprintf 'git clone --bare %s %s', $repos, $bare );
 }
 
 sub create_blob {
@@ -139,6 +161,15 @@ sub update_blob {
     return $digest;
 }
 
+sub delete_blob {
+    my ( $digest, $name ) = @_;
+    my $repos = dir( "$REPOS_DIR/$digest" );
+    my $file = file( "$repos/$name" );
+    $file->remove;
+    system( sprintf 'cd %s && git commit -a -m "removed blob"', $repos );
+    system( sprintf 'cd %s && git push origin master', $repos );
+}
+
 sub set_routes {
     get '/' => 'root';
     post '/' => sub {
@@ -160,6 +191,7 @@ sub set_routes {
         my $self = shift;
         my $digest = $self->stash( 'digest' );
         if ( $digest ) {
+            clone_repos( $digest );
             my $blobs = read_repos( $digest );
             my $meta = read_commit( $digest );
             $self->stash(
@@ -201,7 +233,7 @@ sub set_routes {
             $self->res->headers->header( location => '/' );
         }
     };
-    get '/edit/:digest/:name' => [ digest => qr/\w{8}/, name => qr/\w+/ ] => sub {
+    get '/edit/:digest/:name' => [ digest => qr/\w{8}/ ] => sub {
         my $self = shift;
         my $digest   = $self->stash( 'digest' );
         my $name     = $self->stash( 'name' );
@@ -209,7 +241,7 @@ sub set_routes {
         $self->stash( contents => $contents );
         $self->render( template => 'root' );
     };
-    post '/edit/:digest/:name' => [ digest => qr/\w{8}/, name => qr/\w+/ ] => sub {
+    post '/edit/:digest/:name' => [ digest => qr/\w{8}/ ] => sub {
         my $self = shift;
         my $digest   = $self->stash( 'digest' );
         my $old_name = $self->stash( 'name' );
@@ -225,6 +257,15 @@ sub set_routes {
             $self->res->code( 302 );
             $self->res->headers->header( location => '/' );
         }
+    };
+    get '/delete/:digest/:name' => [ digest => qr/\w{8}/ ] => sub {
+        my $self = shift;
+        my $digest   = $self->stash( 'digest' );
+        my $name     = $self->stash( 'name' );
+        warn $digest; warn $name;
+        delete_blob( $digest, $name );
+        $self->res->code( 302 );
+        $self->res->headers->header( location => '/' . $digest );
     };
 }
 
@@ -252,7 +293,7 @@ error occured.
 <div class="repos"><span class="label">Clone URL: </span><span class="repos_url"><a href="git://<%= $self->stash( 'server' ) %>/<%= $self->stash( 'digest' ) %>.git">git://<%= $self->stash( 'server' ) %>/<%= $self->stash( 'digest' ) %>.git</a></span></div>
 % for my $blob ( @{ $self->stash( 'blobs' ) } ) {
 <div class="blob">
-    <div class="name"><span><%= escape( $blob->{ name } ) %></span><span class="edit"><a href="/edit/<%= $self->stash( 'digest' ) %>/<%= $blob->{ name } %>">edit</a></span></div>
+    <div class="name"><span><%= html_escape( $blob->{ name } ) %></span><span class="edit"><a href="/edit/<%= $self->stash( 'digest' ) %>/<%= uri_escape( $blob->{ name } ) %>">edit</a></span><span class="delete"><a href="/delete/<%= $self->stash( 'digest' ) %>/<%= uri_escape( $blob->{ name } ) %>">delete</a></span></div>
     <div class="contents">
         <div class="line">
 % my $line_num = 0;
@@ -260,7 +301,7 @@ error occured.
             <div class="line_number"><%= ++$line_num %></div>
 % }
         </div>
-        <div class="body"><%= nl2br( escape( $blob->{ contents } ) ) %></div>
+        <div class="body"><%= nl2br( html_escape( $blob->{ contents } ) ) %></div>
     </div>
     <div class="clear"><hr /></div>
 </div>
@@ -270,7 +311,7 @@ error occured.
 <div id=""><a href="/add/<%= $self->stash( 'digest' ) %>">add file</a></div>
 % my $meta = $self->stash( 'meta' );
 % for my $m ( @$meta ) {
-<%= $m->{ date } %> <%= substr( $m->{ sha1 }, 0, 6 ) %> <%= $m->{ author } %><br />
+<%= $m->{ date } %> <%= substr( $m->{ sha1 }, 0, 6 ) %><br />
 % }
 </div>
 
@@ -280,14 +321,14 @@ error occured.
 
 <div id="data">
 % if ( $self->stash( 'digest' ) && $self->stash( 'name' ) ) {
-<form action="/edit/<%= $self->stash( 'digest' ) %>/<%= $self->stash( 'name' ) %>" method="post">
+<form action="/edit/<%= $self->stash( 'digest' ) %>/<%= uri_escape( $self->stash( 'name' ) ) %>" method="post">
 % } elsif ( $self->stash( 'digest' ) ) {
 <form action="/add/<%= $self->stash( 'digest' ) %>" method="post">
 % } else {
 <form action="/" method="post">
 % }
-<input type="text" name="name" class="form_name" value="<%= $self->stash( 'name' ) %>"/>
-<textarea name="contents" class="form_contents"><%= $self->stash( 'contents' ) %></textarea>
+<input type="text" name="name" class="form_name" value="<%= html_escape( $self->stash( 'name' ) ) %>"/>
+<textarea name="contents" class="form_contents"><%= html_escape( $self->stash( 'contents' ) ) %></textarea>
 <div class="submit">
 <input type="submit" value="Paste it" class="form_paste" />
 </div>
@@ -451,9 +492,9 @@ input {
     margin-bottom: 0.8em;
 }
 
-.edit {
+.edit, .delete {
     font: 0.7em helvetica, arial, sans-serif;
-    padding: 0.8em;
+    padding-left: 0.8em;
     position: relative;
 }
 
@@ -464,7 +505,7 @@ input {
 <body>
 <div id="wrapper">
 <div id="header">
-<div id="logo"><a href="/"><span style="color: #ff3300">re</span><span style="color: #0033ff">code</span></a></div>
+<div id="logo"><a href="/"><span style="color: #ff3300; font-weight: bold;">re</span><span style="color: #0033ff; font-weight: bold;">code</span></a></div>
 <div id="subtitle">Paste your code and share it.</div>
 </div>
 <div id="inner">
