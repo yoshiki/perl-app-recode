@@ -272,20 +272,21 @@ sub set_routes {
 init;
 set_routes;
 shagadelic;
+
 __DATA__
-@@ exception.html.eplite
+@@ exception.html.epl
 % my $self = shift;
 % $self->stash( layout => 'base' );
 
 error occured.
 
-@@ error.html.eplite
+@@ error.html.epl
 % my $self = shift;
 % $self->stash( layout => 'base' );
 
 <%= $self->stash( 'error' ) %>
 
-@@ view.html.eplite
+@@ view.html.epl
 % my $self = shift;
 % $self->stash( layout => 'base' );
 
@@ -315,7 +316,7 @@ error occured.
 % }
 </div>
 
-@@ root.html.eplite
+@@ root.html.epl
 % my $self = shift;
 % $self->stash( layout => 'base' );
 
@@ -336,7 +337,7 @@ error occured.
 </div>
 <div id="meta"></div>
 
-@@ layouts/base.html.eplite
+@@ layouts/base.html.epl
 % my $self = shift;
 <!doctype>
 <!html>

@@ -1,13 +1,30 @@
 recode - gist clone
 
-* How to start
+* ABOUT
 
-1. Run recode.pl as a daemon.
+Recode is gist clone. You can paste your code and share it with your friends.
+
+* REQUIREMENT
+
+- git
+
+- CPAN modules
+
+  Cwd
+  Digest::SHA1
+  Encode
+  HTML::Entities
+  Mojolicious::Lite
+  Path::Class
+  URI::Escape
+
+* USAGE
+
+- Run recode.pl as a daemon.
 
   % ./recode.pl daemon
 
-2. Run git-daemon. YOUR_REPOS_PATH is 'bare'.
-   'bare' directory was created when recode.pl runs.
+- Run git-daemon. YOUR_REPOS_PATH is 'bare' in default.
+  'bare' directory was created when recode.pl runs.
 
   % git daemon --export-all --enable=receive-pack --base-path=YOUR_REPOS_PATH
-
