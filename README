@@ -4,6 +4,10 @@ recode - gist clone
 
 Recode is gist clone. You can paste your code and share it with your friends.
 
+* WARNING
+
+Recode does not support branches and managing per-user code.
+
 * REQUIREMENT
 
 - git
