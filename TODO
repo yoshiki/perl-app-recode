@@ -1,6 +1,7 @@
 * TODO
 
-- Account support.
+- Per-user code management support.
+- Colorize code support.
 - Branch support.
 - Brush up design.
 - Need Mojolicious?

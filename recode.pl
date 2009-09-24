@@ -71,6 +71,7 @@ sub create_repos {
     $repos->mkpath unless -d $repos;
     my $file = file( "$repos/$name" );
     my $fh = $file->openw;
+    $contents =~ s/\r?\n/\n/g; # cleanup
     print $fh $contents;
     close $fh;
 
@@ -127,6 +128,7 @@ sub create_blob {
     my $repos = dir( "$REPOS_DIR/$digest" );
     my $file = file( "$repos/$name" );
     my $fh = $file->openw;
+    $contents =~ s/\r?\n/\n/g; # cleanup
     print $fh $contents;
     close $fh;
     system( sprintf 'cd %s && git add %s && git commit -a -m "blob created"', $repos, $name );
