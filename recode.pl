@@ -324,14 +324,14 @@ error occured.
 
 <div id="data">
 % if ( $self->stash( 'digest' ) && $self->stash( 'name' ) ) {
-<form action="/edit/<%= $self->stash( 'digest' ) %>/<%= uri_escape( $self->stash( 'name' ) ) %>" method="post">
+<form action="/edit/<%= $self->stash( 'digest' ) %>/<%= uri_escape( $self->stash( 'name' ) || '' ) %>" method="post">
 % } elsif ( $self->stash( 'digest' ) ) {
 <form action="/add/<%= $self->stash( 'digest' ) %>" method="post">
 % } else {
 <form action="/" method="post">
 % }
-<input type="text" name="name" class="form_name" value="<%= html_escape( $self->stash( 'name' ) ) %>"/>
-<textarea name="contents" class="form_contents"><%= html_escape( $self->stash( 'contents' ) ) %></textarea>
+<input type="text" name="name" class="form_name" value="<%= html_escape( $self->stash( 'name' ) || '' ) %>"/>
+<textarea name="contents" class="form_contents"><%= html_escape( $self->stash( 'contents' ) || '' ) %></textarea>
 <div class="submit">
 <input type="submit" value="Paste it" class="form_paste" />
 </div>
